@@ -120,9 +120,6 @@
   <data name="AppName" xml:space="preserve">
     <value>DropboxWrapper</value>
   </data>
-  <data name="CompressionAppFolderPath" xml:space="preserve">
-    <value>CompressionAppFolderPath</value>
-  </data>
   <data name="CompressionAppText" xml:space="preserve">
     <value>Compression app folder path</value>
   </data>
@@ -132,6 +129,9 @@
   </data>
   <data name="DropboxFolderPath" xml:space="preserve">
     <value>DropboxFolderPath</value>
+  </data>
+  <data name="FirstRun" xml:space="preserve">
+    <value>FirstRun</value>
   </data>
   <data name="MissingPath" xml:space="preserve">
     <value>Missing path</value>
@@ -147,9 +147,6 @@
   </data>
   <data name="UploadTypeIndex" xml:space="preserve">
     <value>UploadTypeIndex</value>
-  </data>
-  <data name="WinRAR" xml:space="preserve">
-    <value>rar.exe</value>
   </data>
   <data name="WrapFolderPath" xml:space="preserve">
     <value>WrapFolderPath</value>

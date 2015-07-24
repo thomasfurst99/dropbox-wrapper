@@ -14,9 +14,6 @@ namespace DropboxWrapper
             reloadData();
         }
 
-        /// <summary>
-        /// Shows folder browser dialog to choose user defined wrap folder.
-        /// </summary>
         private void chooseWrapFolderBtn_Click(object sender, System.EventArgs e)
         {
             folderSelect.Description = "Choose your wrap folder";
@@ -30,9 +27,6 @@ namespace DropboxWrapper
             folderSelect.Reset();
         }
 
-        /// <summary>
-        /// Shows folder browser dialog to choose user Dropbox folder.
-        /// </summary>
         private void chooseDropboxFolderBtn_Click(object sender, System.EventArgs e)
         {
             folderSelect.Description = "Choose your Dropbox folder";
@@ -46,9 +40,6 @@ namespace DropboxWrapper
             folderSelect.Reset();
         }
 
-        /// <summary>
-        /// Shows folder browser dialog to choose compression app folder (like WinRAR root folder etc.).
-        /// </summary>
         private void chooseCompressionAppFolderBtn_Click(object sender, EventArgs e)
         {
             folderSelect.Description = "Choose your folder for " + uploadTypeCheckbox.SelectedItem.ToString();
@@ -58,7 +49,7 @@ namespace DropboxWrapper
                 // If user want to use win rar to compress files must check if selected folder contains WinRAR (rar.exe)
                 if (uploadTypeCheckbox.SelectedItem.ToString() == FileAndFolderHandlerUploadType.WinRAR.ToString())
                 {
-                    if (Directory.GetFiles(folderSelect.SelectedPath, Properties.Resources.WinRAR).Length == 1)
+                    if (Directory.GetFiles(folderSelect.SelectedPath, "rar.exe").Length == 1)
                     {
                         Registry.SetValue(Properties.Resources.RegistryPath, uploadTypeCheckbox.SelectedItem.ToString(), folderSelect.SelectedPath);
                     }
@@ -73,9 +64,6 @@ namespace DropboxWrapper
             folderSelect.Reset();
         }
 
-        /// <summary>
-        /// Load all values from registers again and set the values to labels etc.
-        /// </summary>
         private void reloadData()
         {
             wrapFolderPathLabel.Text =
@@ -103,9 +91,6 @@ namespace DropboxWrapper
             }
         }
 
-        /// <summary>
-        /// Save new index and item to registers and make label and button enabled / disabled depending on settings.
-        /// </summary>
         private void uploadTypeCheckbox_SelectedIndexChanged(object sender, EventArgs e)
         {
             Registry.SetValue(Properties.Resources.RegistryPath, Properties.Resources.UploadTypeIndex, uploadTypeCheckbox.SelectedIndex);

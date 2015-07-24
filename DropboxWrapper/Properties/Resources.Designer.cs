@@ -70,15 +70,6 @@ namespace DropboxWrapper.Properties {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to CompressionAppFolderPath.
-        /// </summary>
-        internal static string CompressionAppFolderPath {
-            get {
-                return ResourceManager.GetString("CompressionAppFolderPath", resourceCulture);
-            }
-        }
-        
-        /// <summary>
         ///   Looks up a localized string similar to Compression app folder path.
         /// </summary>
         internal static string CompressionAppText {
@@ -103,6 +94,15 @@ namespace DropboxWrapper.Properties {
         internal static string DropboxFolderPath {
             get {
                 return ResourceManager.GetString("DropboxFolderPath", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to FirstRun.
+        /// </summary>
+        internal static string FirstRun {
+            get {
+                return ResourceManager.GetString("FirstRun", resourceCulture);
             }
         }
         
@@ -148,15 +148,6 @@ namespace DropboxWrapper.Properties {
         internal static string UploadTypeIndex {
             get {
                 return ResourceManager.GetString("UploadTypeIndex", resourceCulture);
-            }
-        }
-        
-        /// <summary>
-        ///   Looks up a localized string similar to rar.exe.
-        /// </summary>
-        internal static string WinRAR {
-            get {
-                return ResourceManager.GetString("WinRAR", resourceCulture);
             }
         }
         

@@ -11,7 +11,7 @@ namespace DropboxWrapper
 
         private NotifyIcon notifyIcon;
 
-        private FileSystemWatcher fileWatcher;
+		private RelativePathFileSystemWatcher fileWatcher;
 
         public Context()
         {
@@ -29,41 +29,61 @@ namespace DropboxWrapper
             // Initializing notify icon
             notifyIcon = new NotifyIcon();
             notifyIcon.Icon = Properties.Resources.DBW_icon;
-            notifyIcon.ContextMenu = new ContextMenu(new MenuItem[] {selectPaths, exit});
+
+            MenuItem[] menuItems = { selectPaths, exit };
+            notifyIcon.ContextMenu = new ContextMenu(menuItems);
+
             notifyIcon.Visible = true;
+
             notifyIcon.DoubleClick += new EventHandler(OpenWrapFolder);
 
-            // Check if it's in startup folder. If not add it!
-            if (Registry.GetValue(Properties.Resources.RegistryStartupPath, Properties.Resources.AppName, null) == null)
+            // If this is first run
+            if (Utils.RegistryGet<string>(Properties.Resources.FirstRun) == null)
             {
-                Registry.SetValue(Properties.Resources.RegistryStartupPath, Properties.Resources.AppName, Application.ExecutablePath.ToString());
+                Utils.RegistrySet(Properties.Resources.FirstRun, "Program is not running for the first time.");
+
+                // Set defaults for registers
+                Utils.RegistrySet(Properties.Resources.DropboxFolderPath, null);
+                Utils.RegistrySet(Properties.Resources.WrapFolderPath, null);
+
+                string zipType = FileAndFolderHandlerUploadType.ZIP.ToString();
+                Utils.RegistrySet(Properties.Resources.UploadType, zipType);
+
+                Utils.RegistrySet(Properties.Resources.UploadTypeIndex, 0);
             }
 
+            string inStartup = Utils.RegistryGet<string>(Properties.Resources.AppName);
+
+            // Check if it's in startup folder. If not add it!
+            if (inStartup == null)
+            {
+                string applicationExecutable = Application.ExecutablePath.ToString();
+                Utils.RegistrySet(Properties.Resources.AppName, applicationExecutable);
+            }
+
+            // Setting values for Globals
+            Globals.DropboxPath = Utils.RegistryGet<string>(Properties.Resources.DropboxFolderPath);
+            Globals.WrapPath = Utils.RegistryGet<string>(Properties.Resources.WrapFolderPath);
+
+            string dbPath = Globals.DropboxPath;
+            string wrapPath = Globals.WrapPath;
+            string uploadType = Utils.RegistryGet<string>(Properties.Resources.UploadType);
+
             // Check if all requred paths are valid.
-            if (!Directory.Exists((string)Registry.GetValue(Properties.Resources.RegistryPath, Properties.Resources.WrapFolderPath, null)) ||
-                !Directory.Exists((string)Registry.GetValue(Properties.Resources.RegistryPath, Properties.Resources.DropboxFolderPath, null)) ||
-                (string)Registry.GetValue(Properties.Resources.RegistryPath, Properties.Resources.UploadType, null) == null)
+            if (!Directory.Exists(dbPath) || !Directory.Exists(wrapPath) || uploadType == null)
             {
                 SelectPaths sp = new SelectPaths();
                 sp.ShowDialog();
             }
             else
             {
-                // initializing file watcher
-                fileWatcher = new FileSystemWatcher();
-                fileWatcher.Path = (string)Registry.GetValue(Properties.Resources.RegistryPath, Properties.Resources.WrapFolderPath, null);
-                fileWatcher.NotifyFilter = NotifyFilters.LastAccess | NotifyFilters.LastWrite | NotifyFilters.Attributes | 
-                    NotifyFilters.DirectoryName | NotifyFilters.FileName;
-                fileWatcher.Filter = "*.*";
-                fileWatcher.IncludeSubdirectories = true;
-                fileWatcher.Changed += new FileSystemEventHandler(UploadToDropbox);
-                fileWatcher.Created += new FileSystemEventHandler(UploadToDropbox);
-                fileWatcher.Deleted += new FileSystemEventHandler(DeleteFromDropbox);
-                fileWatcher.Renamed += new RenamedEventHandler(RenameOnDropbox);
+				// initializing file watcher
+				fileWatcher = new RelativePathFileSystemWatcher(wrapPath);
+				fileWatcher.Changed += new RelativePathFileSystemEventHandler(UploadToDropbox);
+				fileWatcher.Created += new RelativePathFileSystemEventHandler(UploadToDropbox);
+				fileWatcher.Deleted += new RelativePathFileSystemEventHandler(DeleteFromDropbox);
+				fileWatcher.Renamed += new RelativePathRenamedEventHandler(RenameOnDropbox);
 
-                fileWatcher.EnableRaisingEvents = true;
-
-                string uploadType = (string)Registry.GetValue(Properties.Resources.RegistryPath, Properties.Resources.UploadType, "");
                 try
                 {
                     if (Enum.GetValues(typeof(FileAndFolderHandlerUploadType)).Length > 0)
@@ -96,68 +116,72 @@ namespace DropboxWrapper
             }
         }
 
-        /// <summary>
-        /// Open user defined wrap folder.
-        /// </summary>
         private void OpenWrapFolder(Object sender, EventArgs e)
         {
-            if (Directory.Exists((string)Registry.GetValue(Properties.Resources.RegistryPath, Properties.Resources.WrapFolderPath, null)))
+            string wrapPath = Globals.WrapPath; 
+            if (Directory.Exists(wrapPath))
             {
-                Process.Start(new ProcessStartInfo()
+                ProcessStartInfo startInfo = new ProcessStartInfo("explorer.exe");
+                startInfo.WindowStyle = ProcessWindowStyle.Normal;
+                startInfo.Arguments = wrapPath;
+                startInfo.Verb = "open";
+
+                try
                 {
-                    FileName = (string)Registry.GetValue(Properties.Resources.RegistryPath, Properties.Resources.WrapFolderPath, null),
-                    UseShellExecute = true,
-                    Verb = "open"
-                });
+                    Process.Start(startInfo);
+                }
+                catch
+                {
+
+                }
             }
         }
 
-        /// <summary>
-        /// Called whenever file or directory is changed in user defined wrap folder.
-        /// </summary>
-        private void UploadToDropbox(object sender, FileSystemEventArgs e)
+		private void UploadToDropbox(object sender, RelativePathFileSystemEventArgs e)
         {
-            if (FileAndFolderHandler.PathIsDirectory(e.FullPath))
+            if (FileAndFolderHandler.PathIsDirectoryInWrap(e.RelativePath))
             {
-                FileAndFolderHandler.UploadFolder(e.FullPath);
+				FileAndFolderHandler.UploadFolder(e.RelativePath);
             }
             else
             {
-                FileAndFolderHandler.UploadFile(e.FullPath, (FileAndFolderHandlerUploadType)Enum.Parse(typeof(FileAndFolderHandlerUploadType), 
-                    (string)Registry.GetValue(Properties.Resources.RegistryPath, 
-                    Properties.Resources.UploadType, FileAndFolderHandlerUploadType.ZIP.ToString())));
+                string zipType = FileAndFolderHandlerUploadType.ZIP.ToString();
+                string uploadType = Utils.RegistryGet<string>(Properties.Resources.UploadType, zipType);
+
+                FileAndFolderHandlerUploadType type = 
+                    (FileAndFolderHandlerUploadType)Enum.Parse(typeof(FileAndFolderHandlerUploadType), uploadType);
+
+                FileAndFolderHandler.UploadFile(e.RelativePath, type);
             }
         }
 
-        /// <summary>
-        /// Called whenever file or directory is deleted in user defined wrap folder.
-        /// </summary>
-        private void DeleteFromDropbox(object sender, FileSystemEventArgs e)
-        {
-            if (Directory.Exists(FileAndFolderHandler.ConvertWrapFolderPathToDropboxFolderPath(e.FullPath, true)))
+        private void DeleteFromDropbox(object sender, RelativePathFileSystemEventArgs e)
+		{
+			if (FileAndFolderHandler.PathIsDirectoryInDropbox(e.RelativePath))
             {
-                FileAndFolderHandler.DeleteFolder(e.FullPath);
+                FileAndFolderHandler.DeleteFolder(e.RelativePath);
             }
             else
             {
-                FileAndFolderHandler.DeleteFile(e.FullPath);
+				FileAndFolderHandler.DeleteFile(e.RelativePath);
             }
         }
 
-        /// <summary>
-        /// Called whenever file or directory is renamed in user defined wrap folder.
-        /// </summary>
-        private void RenameOnDropbox(object sender, RenamedEventArgs e)
+		private void RenameOnDropbox(object sender, RelativePathRenamedEventArgs e)
         {
-            if (FileAndFolderHandler.PathIsDirectory(e.FullPath))
+            if (FileAndFolderHandler.PathIsDirectoryInWrap(e.RelativePath))
             {
-                FileAndFolderHandler.RenameFolder(e.OldFullPath, e.FullPath);
+                FileAndFolderHandler.RenameFolder(e.OldRelativePath, e.RelativePath);
             }
             else
             {
-                FileAndFolderHandler.RenameFile(e.OldFullPath, e.FullPath, (FileAndFolderHandlerUploadType)Enum.Parse(typeof(FileAndFolderHandlerUploadType),
-                    (string)Registry.GetValue(Properties.Resources.RegistryPath,
-                    Properties.Resources.UploadType, FileAndFolderHandlerUploadType.ZIP.ToString())));
+                string zipType = FileAndFolderHandlerUploadType.ZIP.ToString();
+                string uploadType = Utils.RegistryGet<string>(Properties.Resources.UploadType, zipType);
+
+                FileAndFolderHandlerUploadType type =
+                    (FileAndFolderHandlerUploadType)Enum.Parse(typeof(FileAndFolderHandlerUploadType), uploadType);
+
+                FileAndFolderHandler.RenameFile(e.OldRelativePath, e.RelativePath, type);
             }
         }
 

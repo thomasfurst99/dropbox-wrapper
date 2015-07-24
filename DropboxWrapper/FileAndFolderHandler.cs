@@ -1,17 +1,11 @@
-﻿using Microsoft.Win32;
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
 using System.Windows.Forms;
 
 namespace DropboxWrapper
 {
-
-
-    /// <summary>
-    /// Use 0 if path is not needed, 1 otherwise
-    /// </summary>
-    public enum FileAndFolderHandlerUploadType: int
+	public enum FileAndFolderHandlerUploadType : int
     {
         ZIP = 0,
         WinRAR = 1
@@ -19,153 +13,185 @@ namespace DropboxWrapper
 
     public static class FileAndFolderHandler
     {
-        /// <summary>
-        /// Add (upload) new file to the user defined Dropbox folder.
-        /// </summary>
-        /// <param name="path">Path to the file in wrap folder.</param>
-        public static void UploadFile(string path, FileAndFolderHandlerUploadType type)
-        {
-            switch(type)
-            {
-                case FileAndFolderHandlerUploadType.ZIP:
-                    string zipPath = ConvertWrapFolderPathToDropboxFolderPath(path);
-                    using (ZipArchive archive = ZipFile.Open(zipPath, ZipArchiveMode.Create))
-                    {
-                        archive.CreateEntryFromFile(path, "file" + Path.GetExtension(path));
-                    }
-                    break;
-                case FileAndFolderHandlerUploadType.WinRAR:
-                    string rarPath = ConvertWrapFolderPathToDropboxFolderPath(path, false, ".rar");
-                    File.Delete(rarPath);
-                    ProcessStartInfo startInfo = new ProcessStartInfo((string)Registry.GetValue(Properties.Resources.RegistryPath, type.ToString(), null) + "\\rar.exe");
-                    startInfo.WindowStyle = ProcessWindowStyle.Hidden;
-                    startInfo.Arguments = "a -ep \"" + rarPath + "\" \"" + path + "\"";
-                    try
-                    {
-                        using (Process exeProcess = Process.Start(startInfo))
-                        {
-                            exeProcess.WaitForExit();
-                        }
-                    }
-                    catch
-                    {
-                        MessageBox.Show("Something goes wrong while RARing your file! We will fix it later.");
-                    }
-                    break;
-                default:
-                    break;
+		public static void UploadFile(string relativePath, FileAndFolderHandlerUploadType type)
+		{
+			switch (type)
+			{
+				case FileAndFolderHandlerUploadType.ZIP:
+					UploadZipFile(relativePath);
+					break;
+				case FileAndFolderHandlerUploadType.WinRAR:
+					UploadRarFile(relativePath);
+					break;
+				default:
+					break;
+			}
+		}
+
+		public static void DeleteFile(string relativePath)
+		{
+			string fullPath = Globals.DropboxPath + relativePath;
+			string dirName = Path.GetDirectoryName(fullPath);
+
+			string noExt = Path.GetFileNameWithoutExtension(fullPath);
+			string pattern = string.Format("{0}.*", noExt);
+
+			string[] files = Directory.GetFiles(dirName, pattern, SearchOption.AllDirectories);
+
+			foreach (string file in files)
+			{
+				File.Delete(file);
+			}
+		}
+
+		public static void RenameFile(string oldRelativePath, string newRelativePath, FileAndFolderHandlerUploadType type)
+		{
+			switch (type)
+			{
+				case FileAndFolderHandlerUploadType.ZIP:
+					RenameZipFile(oldRelativePath, newRelativePath);
+					break;
+				case FileAndFolderHandlerUploadType.WinRAR:
+					RenameRarFile(oldRelativePath, newRelativePath);
+					break;
+				default:
+					break;
+			}
+		}
+
+		public static void UploadFolder(string relativePath)
+		{
+			string fullPath = Globals.DropboxPath + relativePath;
+			Directory.CreateDirectory(fullPath);
+		}
+
+		public static void DeleteFolder(string relativePath)
+		{
+			string fullPath = Globals.DropboxPath + relativePath;
+			Directory.Delete(fullPath, true);
+		}
+
+		public static void RenameFolder(string oldRelativePath, string newRelativePath)
+		{
+			string fullOldPath = Globals.DropboxPath + oldRelativePath;
+			string fullNewPath = Globals.DropboxPath + newRelativePath;
+
+			Directory.Move(fullOldPath, fullNewPath);
+		}
+
+		public static bool PathIsDirectoryInWrap(string relativePath)
+		{
+			string fullPath = Globals.WrapPath + relativePath;
+			return Directory.Exists(fullPath);
+		}
+
+		public static bool PathIsDirectoryInDropbox(string relativePath)
+		{
+			string fullPath = Globals.DropboxPath + relativePath;
+			return Directory.Exists(fullPath);
+		}
+
+		private static void UploadZipFile(string relativePath)
+		{
+			string fullWrapPath = Globals.WrapPath + relativePath;
+			string fullPath = Globals.DropboxPath + relativePath;
+
+			string zipPath = Path.ChangeExtension(fullPath, ".zip");
+
+			using (ZipArchive archive = ZipFile.Open(zipPath, ZipArchiveMode.Create))
+			{
+				string fileExt = Path.GetExtension(fullPath);
+				string entryName = "file" + fileExt;
+
+				archive.CreateEntryFromFile(fullWrapPath, entryName);
+			}
+		}
+
+		private static void UploadRarFile(string relativePath)
+		{
+			string rarExt = ".rar";
+
+			string fullWrapPath = Globals.WrapPath + relativePath;
+			string fullPath = Globals.DropboxPath + relativePath;
+
+			string rarFilePath;
+
+			if (Path.GetExtension(fullPath) == "")
+			{
+				rarFilePath = fullPath + rarExt;
+			}
+			else
+			{
+				rarFilePath = Path.ChangeExtension(fullPath, rarExt);
             }
-        }
 
-        /// <summary>
-        /// Delete file from the user defined Dropbox folder.
-        /// </summary>
-        /// <param name="path">Path to file in wrap folder.</param>
-        public static void DeleteFile(string path)
-        {
-            string[] files = Directory.GetFiles(Path.GetDirectoryName(ConvertWrapFolderPathToDropboxFolderPath(path)), 
-                string.Format("{0}.*", Path.GetFileNameWithoutExtension(ConvertWrapFolderPathToDropboxFolderPath(path))), 
-                SearchOption.AllDirectories);
-            foreach (string file in files)
-            {
-                File.Delete(file);
-            }
-        }
+            string rarType = FileAndFolderHandlerUploadType.WinRAR.ToString();
+			string rarPath = Utils.RegistryGet<string>(rarType);
 
-        /// <summary>
-        /// Rename file in the user defined Dropbox folder.
-        /// </summary>
-        /// <param name="path">Path to the file in the wrap folder.</param>
-        /// <param name="newName">File will be renamed to this new name.</param>
-        public static void RenameFile(string path, string newPath, FileAndFolderHandlerUploadType type = FileAndFolderHandlerUploadType.ZIP)
-        {
-            switch(type)
-            {
-                case FileAndFolderHandlerUploadType.ZIP:
-                    File.Move(ConvertWrapFolderPathToDropboxFolderPath(path), ConvertWrapFolderPathToDropboxFolderPath(newPath));
-                    break;
-                case FileAndFolderHandlerUploadType.WinRAR:
-                    File.Move(ConvertWrapFolderPathToDropboxFolderPath(path, false, ".rar"), ConvertWrapFolderPathToDropboxFolderPath(newPath, false, ".rar"));
+			string processStartInfo = "\"" + rarPath + "\\rar.exe" + "\"";
+			string arguments = " a -ep \"" + rarFilePath + "\" \"" + fullWrapPath + "\"";
 
-                    // Rename file in archive
-                    string rarPath = ConvertWrapFolderPathToDropboxFolderPath(newPath, false, ".rar");
-                    ProcessStartInfo startInfo = new ProcessStartInfo((string)Registry.GetValue(Properties.Resources.RegistryPath, type.ToString(), null) + "\\rar.exe");
-                    startInfo.WindowStyle = ProcessWindowStyle.Hidden;
-                    startInfo.Arguments = "rn \"" + rarPath + "\" \"" + Path.GetFileName(path) + "\" \"" + Path.GetFileName(newPath) + "\"";
-                    try
-                    {
-                        using (Process exeProcess = Process.Start(startInfo))
-                        {
-                            exeProcess.WaitForExit();
-                        }
-                    }
-                    catch
-                    {
-                        MessageBox.Show("Something goes wrong while RARing your file! We will fix it later.");
-                    }
-                    break;
-                default:
-                    break;
-            }
-        }
+			File.Delete(rarFilePath);
+			ProcessStartInfo startInfo = new ProcessStartInfo(processStartInfo);
+			startInfo.WindowStyle = ProcessWindowStyle.Hidden;
+			startInfo.Arguments = arguments;
 
-        /// <summary>
-        /// Create a new folder in the user defined Dropbox folder.
-        /// </summary>
-        /// <param name="path">Path of the folder in user wrap folder.</param>
-        public static void UploadFolder(string path)
-        {
-            Directory.CreateDirectory(ConvertWrapFolderPathToDropboxFolderPath(path, true));
-        }
+			try
+			{
+				using (Process exeProcess = Process.Start(startInfo))
+				{
+					exeProcess.WaitForExit();
+				}
+			}
+			catch
+			{
+				MessageBox.Show("Something goes wrong while RARing your file! We will fix it later.");
+			}
+		}
 
-        /// <summary>
-        /// Delete complete folder from the user defined Dropbox folder.
-        /// </summary>
-        /// <param name="path">Path of the folder to be deleted in user wrap folder.</param>
-        public static void DeleteFolder(string path)
-        {
-            Directory.Delete(ConvertWrapFolderPathToDropboxFolderPath(path, true), true);
-        }
+		private static void RenameZipFile(string oldRelativePath, string newRelativePath)
+		{
+			string fullOldPath = Globals.DropboxPath + oldRelativePath;
+			string fullNewPath = Globals.DropboxPath + newRelativePath;
 
-        /// <summary>
-        /// Rename specified folder in the user defined Dropbox folder.
-        /// </summary>
-        /// <param name="path">Path to the folder in user wrap folder</param>
-        /// <param name="newName">New name of the folder.</param>
-        public static void RenameFolder(string path, string newPath)
-        {
-            // Now using File.Move function. Maybe not the best option.
-            Directory.Move(ConvertWrapFolderPathToDropboxFolderPath(path, true), ConvertWrapFolderPathToDropboxFolderPath(newPath, true));
-        }
+			File.Move(fullOldPath, fullNewPath);
+		}
 
-        /// <summary>
-        /// Convert path from user defined wrap folder to user defined Dropbox folder path.
-        /// </summary>
-        /// <param name="path">Path in user defined wrap folder.</param>
-        /// <returns>Returns path in user defined Dropbox folder.</returns>
-        public static string ConvertWrapFolderPathToDropboxFolderPath(string path, bool directory = false, string extension = ".zip")
-        {
-            return Path.ChangeExtension((string)Registry.GetValue(Properties.Resources.RegistryPath, Properties.Resources.DropboxFolderPath, null) +
-                path.Replace((string)Registry.GetValue(Properties.Resources.RegistryPath, Properties.Resources.WrapFolderPath, null), ""), directory ? "" : extension);
-        }
+		private static void RenameRarFile(string oldRelativePath, string newRelativePath)
+		{
+			string fullOldWrapPath = Globals.WrapPath + oldRelativePath;
+			string fullNewWrapPath = Globals.WrapPath + newRelativePath;
 
-        /// <summary>
-        /// Check is specified path is directory or file.
-        /// </summary>
-        /// <param name="path">Path to be checked.</param>
-        /// <returns>Returns true if path is directory, false otherwise.</returns>
-        public static bool PathIsDirectory(string path)
-        {
-            FileAttributes attributes = File.GetAttributes(path);
+			string fullOldPath = Globals.DropboxPath + oldRelativePath;
+			string fullNewPath = Globals.DropboxPath + newRelativePath;
 
-            if (attributes.HasFlag(FileAttributes.Directory))
-            {
-                return true;
-            }
-            else
-            {
-                return false;
-            }
-        }
+			File.Move(fullOldPath, fullNewPath);
+
+			// Rename file in archive
+			string rarType = FileAndFolderHandlerUploadType.WinRAR.ToString();
+			string rarPath = Utils.RegistryGet<string>(rarType);
+
+			string fileName = Path.GetFileName(fullOldWrapPath);
+			string newFileName = Path.GetFileName(fullNewWrapPath);
+
+			string processStartInfo = rarPath + "\\rar.exe";
+			string arguments = "rn \"" + fullNewPath + "\" \"" + fileName + "\" \"" + newFileName + "\"";
+
+			ProcessStartInfo startInfo = new ProcessStartInfo(processStartInfo);
+			startInfo.WindowStyle = ProcessWindowStyle.Hidden;
+			startInfo.Arguments = arguments;
+
+			try
+			{
+				using (Process exeProcess = Process.Start(startInfo))
+				{
+					exeProcess.WaitForExit();
+				}
+			}
+			catch
+			{
+				MessageBox.Show("Something goes wrong while RARing your file! We will fix it later.");
+			}
+		}
     }
 }
