@@ -1,4 +1,5 @@
-﻿using System.Diagnostics;
+﻿using System;
+using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
 using System.Windows.Forms;
@@ -89,6 +90,94 @@ namespace DropboxWrapper
 		{
 			string fullPath = Globals.DropboxPath + relativePath;
 			return Directory.Exists(fullPath);
+		}
+
+		public static void UploadMissingFiles()
+		{
+			string wrapPath = Globals.WrapPath;
+			string dropboxPath = Globals.DropboxPath;
+
+			string filePattern = "*.*";
+			string folderPattern = "*";
+
+			string zipType = FileAndFolderHandlerUploadType.ZIP.ToString();
+			string uploadType = Utils.RegistryGet<string>(Properties.Resources.UploadType, zipType);
+
+			FileAndFolderHandlerUploadType type =
+					(FileAndFolderHandlerUploadType)Enum.Parse(typeof(FileAndFolderHandlerUploadType), uploadType);
+
+			string[] files = Directory.GetFiles(wrapPath, filePattern, SearchOption.AllDirectories);
+			string[] dirs = Directory.GetDirectories(wrapPath, folderPattern, SearchOption.AllDirectories);
+
+			foreach (string file in files)
+			{
+				string relativePath = Utils.GetRelativePath(file, wrapPath);
+				string fullDropboxPath = dropboxPath + relativePath;
+				string ext = ".rar";
+
+				string fullDropboxPathWithoutExt = Path.ChangeExtension(fullDropboxPath, ext);
+
+				if (!File.Exists(fullDropboxPathWithoutExt))
+				{
+					UploadFile(relativePath, type);
+				}
+			}
+
+			foreach (string dir in dirs)
+			{
+				string relativePath = Utils.GetRelativePath(dir, wrapPath);
+				string fullDropboxPath = dropboxPath + relativePath;
+
+				if (!Directory.Exists(fullDropboxPath))
+				{
+					UploadFolder(relativePath);
+				}
+			}
+		}
+
+		public static void DeleteIndwellingFiles()
+		{
+			string wrapPath = Globals.WrapPath;
+			string dropboxPath = Globals.DropboxPath;
+
+			string filePattern = "*.*";
+			string folderPattern = "*";
+
+			string[] files = Directory.GetFiles(dropboxPath, filePattern, SearchOption.AllDirectories);
+			string[] dirs = Directory.GetDirectories(dropboxPath, folderPattern, SearchOption.AllDirectories);
+
+			foreach (string file in files)
+			{
+				string parentFolder = Path.GetDirectoryName(file);
+				string filenameWithoutExt = Path.GetFileNameWithoutExtension(file);
+				string pattern = filenameWithoutExt + ".*";
+
+				string parrentRelativePath = Utils.GetRelativePath(parentFolder, dropboxPath);
+				string fullWrapPath = wrapPath + parrentRelativePath;
+
+				string[] filesFound = Directory.GetFiles(fullWrapPath, pattern, SearchOption.TopDirectoryOnly);
+
+				if (filesFound.Length != 1)
+				{
+					File.Delete(file);
+				}
+			}
+
+			foreach (string dir in dirs)
+			{
+				string parentFolder = Path.GetDirectoryName(dir);
+				string folderName = Path.GetFileName(dir);
+
+				string parentRelativPath = Utils.GetRelativePath(parentFolder, dropboxPath);
+				string fullWrapPath = wrapPath + parentRelativPath;
+
+				string[] dirsFound = Directory.GetDirectories(fullWrapPath, folderName, SearchOption.TopDirectoryOnly);
+
+				if (dirsFound.Length != 1)
+				{
+					Directory.Delete(dir);
+				}
+			}
 		}
 
 		private static void UploadZipFile(string relativePath)

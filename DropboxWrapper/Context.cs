@@ -113,6 +113,10 @@ namespace DropboxWrapper
                     MessageBox.Show("It looks there is no compression method!!!", "Big error!");
                     Environment.Exit(1);
                 }
+
+				// Upload missing files and delete indwelling files
+				FileAndFolderHandler.DeleteIndwellingFiles();
+				FileAndFolderHandler.UploadMissingFiles();
             }
         }
 
